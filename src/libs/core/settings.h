@@ -109,6 +109,7 @@ public:
 
     // Other
     QString docsetPath;
+    QString docsetUrl;
 
     // State
     QByteArray windowGeometry;

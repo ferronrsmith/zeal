@@ -35,6 +35,7 @@
 
 namespace {
 // Configuration file groups
+constexpr char ApiServerUrl[] = "https://gist.githubusercontent.com/ferronrsmith/bfd57c087509cdfc37a44f0c4979b4e2/raw/docsets.json";
 constexpr char GroupContent[] = "content";
 constexpr char GroupDocsets[] = "docsets";
 constexpr char GroupGlobalShortcuts[] = "global_shortcuts";
@@ -156,6 +157,11 @@ void Settings::load()
         docsetPath = QStringLiteral("docsets");
 #endif
     }
+    if (settings->contains(QStringLiteral("docset_url"))) {
+        docsetUrl = settings->value(QStringLiteral("docset_url")).toString();
+    } else {
+        docsetUrl = ApiServerUrl;
+    }
     settings->endGroup();
 
     // Create the docset storage directory if it doesn't exist.
@@ -234,6 +240,7 @@ void Settings::save()
 
     settings->beginGroup(GroupDocsets);
     settings->setValue(QStringLiteral("path"), docsetPath);
+    settings->setValue(QStringLiteral("docset_url"), docsetUrl);
     settings->endGroup();
 
     settings->beginGroup(GroupState);

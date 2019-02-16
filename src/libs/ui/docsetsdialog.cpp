@@ -60,6 +60,13 @@ constexpr char ApiServerUrl[] = "https://api.zealdocs.org/v1";
 constexpr char RedirectServerUrl[] = "https://go.zealdocs.org/d/%1/%2/latest";
 // TODO: Each source plugin should have its own cache
 constexpr char DocsetListCacheFileName[] = "com.kapeli.json";
+constexpr char UserContributedDocsetListCacheFileName[] = "com.kapeli.json.user_contributed";
+
+// TODO manage mirror
+constexpr char UserContributedApiUrl[] =
+  "http://london.kapeli.com/feeds/zzz/user_contributed/build/index.json";
+constexpr char UserContributedDocsetListUrl[] =
+  "http://london.kapeli.com/feeds/zzz/user_contributed/build/%1/%2";
 
 // TODO: Make the timeout period configurable
 constexpr int CacheTimeout = 24 * 60 * 60 * 1000; // 24 hours in microseconds
@@ -68,6 +75,9 @@ constexpr int CacheTimeout = 24 * 60 * 60 * 1000; // 24 hours in microseconds
 constexpr char DocsetNameProperty[] = "docsetName";
 constexpr char DownloadTypeProperty[] = "downloadType";
 constexpr char ListItemIndexProperty[] = "listItem";
+constexpr char DocsetTypeProperty[] = "docsetTypeProperty";
+constexpr char DocsetListCacheFileNameProperty[] = "docsetListCacheFileNameProperty";
+
 } // namespace
 
 DocsetsDialog::DocsetsDialog(Core::Application *app, QWidget *parent)
@@ -79,7 +89,9 @@ DocsetsDialog::DocsetsDialog(Core::Application *app, QWidget *parent)
     ui->setupUi(this);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
-    loadDocsetList();
+    loadUserFeedList();
+    loadDocsetList(cacheLocation(DocsetListCacheFileName), Official);
+    loadDocsetList(cacheLocation(UserContributedDocsetListCacheFileName), UserContributed);
 
     m_isStorageReadOnly = !isDirWritable(m_application->settings()->docsetPath);
 
@@ -288,7 +300,8 @@ void DocsetsDialog::downloadCompleted()
     case DownloadDocsetList: {
         const QByteArray data = reply->readAll();
 
-        QScopedPointer<QFile> file(new QFile(cacheLocation(DocsetListCacheFileName)));
+        QString docsetListCacheFileName = reply->property(DocsetListCacheFileNameProperty).toString();
+        QScopedPointer<QFile> file(new QFile(cacheLocation(docsetListCacheFileName)));
         if (file->open(QIODevice::WriteOnly))
             file->write(data);
 
@@ -313,7 +326,7 @@ void DocsetsDialog::downloadCompleted()
             break;
         }
 
-        processDocsetList(jsonDoc.array());
+        processDocsetList(jsonDoc, DocsetType(reply->property(DocsetTypeProperty).toUInt()));
         break;
     }
 
@@ -467,11 +480,9 @@ void DocsetsDialog::extractionProgress(const QString &filePath, qint64 extracted
         listItem->setData(DocsetListItemDelegate::ValueRole, percent(extracted, total));
 }
 
-void DocsetsDialog::loadDocsetList()
+void DocsetsDialog::loadDocsetList(const QString& cacheFileName, DocsetType type)
 {
-    loadUserFeedList();
-
-    const QFileInfo fi(cacheLocation(DocsetListCacheFileName));
+    const QFileInfo fi(cacheFileName);
     if (!fi.exists() || fi.lastModified().msecsTo(QDateTime::currentDateTime()) > CacheTimeout) {
         downloadDocsetList();
         return;
@@ -495,7 +506,7 @@ void DocsetsDialog::loadDocsetList()
     const QString updateTime
             = fi.lastModified().toString(QLocale::system().dateTimeFormat(QLocale::ShortFormat));
     ui->lastUpdatedLabel->setText(updateTime);
-    processDocsetList(jsonDoc.array());
+    processDocsetList(jsonDoc, type);
 }
 
 void DocsetsDialog::setupInstalledDocsetsTab()
@@ -721,22 +732,33 @@ void DocsetsDialog::downloadDocsetList()
     ui->availableDocsetList->clear();
     m_availableDocsets.clear();
 
-    QNetworkReply *reply = download(QUrl(ApiServerUrl + QLatin1String("/docsets")));
+    QNetworkReply *reply = download(QUrl(m_application->settings()->docsetUrl));
     reply->setProperty(DownloadTypeProperty, DownloadDocsetList);
+    reply->setProperty(DocsetTypeProperty, Official);
+    reply->setProperty(DocsetListCacheFileNameProperty, DocsetListCacheFileName);
+
+    // download user contributed docset
+    reply = download(QUrl(UserContributedApiUrl));
+    reply->setProperty(DownloadTypeProperty, DownloadDocsetList);
+    reply->setProperty(DocsetTypeProperty, UserContributed);
+    reply->setProperty(DocsetListCacheFileNameProperty, UserContributedDocsetListCacheFileName);
 }
 
-void DocsetsDialog::processDocsetList(const QJsonArray &list)
+void DocsetsDialog::processDocsetList(const QJsonDocument &jsonDoc, DocsetType type )
 {
-    for (const QJsonValue &v : list) {
+    QJsonArray jsonArray;
+    if (type == UserContributed) {
+        jsonArray = getUserContributedDocsetList(jsonDoc);
+    }
+    else {
+        jsonArray = jsonDoc.array();
+    }
+
+    for (const QJsonValue &v : jsonArray) {
         QJsonObject docsetJson = v.toObject();
 
         Registry::DocsetMetadata metadata(docsetJson);
         m_availableDocsets.insert({metadata.name(), metadata});
-    }
-
-    // TODO: Move into dedicated method
-    for (const auto &kv : m_availableDocsets) {
-        const auto &metadata = kv.second;
 
         auto listItem = new QListWidgetItem(metadata.icon(), metadata.title(), ui->availableDocsetList);
         listItem->setData(Registry::ItemDataRole::DocsetNameRole, metadata.name());
@@ -769,6 +791,7 @@ void DocsetsDialog::downloadDashDocset(const QModelIndex &index)
     if (m_availableDocsets.count(name) == 0 && !m_userFeeds.contains(name))
         return;
 
+    Registry::DocsetMetadata metadata = m_availableDocsets[name];
     QUrl url;
     if (!m_userFeeds.contains(name)) {
         // No feed present means that this is a Kapeli docset
@@ -851,4 +874,24 @@ bool DocsetsDialog::isDirWritable(const QString &path)
 {
     auto file = std::make_unique<QTemporaryFile>(path + QLatin1String("/.zeal_writable_check_XXXXXX.tmp"));
     return file->open();
+}
+
+QJsonArray DocsetsDialog::getUserContributedDocsetList(const QJsonDocument& jsonDoc) const
+{
+    QJsonArray jsonArray;
+    QJsonObject docsets = jsonDoc.object().value("docsets").toObject();
+    for (auto it = docsets.begin(), end = docsets.end(); it != end; ++it) {
+        QJsonObject object = it->toObject();
+        object[QStringLiteral("title")] = object[QStringLiteral("name")];
+        object[QStringLiteral("icon2x")] = object[QStringLiteral("icon\\@2x")];
+
+        // build download url
+        QString name = object[QStringLiteral("name")].toString();
+        QString archiveUrl = object[QStringLiteral("archive")].toString();
+        QString url = QString(UserContributedDocsetListUrl).arg(name, archiveUrl);
+        object[QStringLiteral("urls")] = QJsonArray::fromStringList(QStringList() << url);
+        jsonArray.append(object);
+    }
+
+    return jsonArray;
 }

@@ -75,13 +75,16 @@ private slots:
     void extractionError(const QString &filePath, const QString &errorString);
     void extractionProgress(const QString &filePath, qint64 extracted, qint64 total);
 
-    void loadDocsetList();
-
 private:
     enum DownloadType {
         DownloadDashFeed,
         DownloadDocset,
         DownloadDocsetList
+    };
+
+    enum DocsetType {
+        Official,
+        UserContributed
     };
 
     Ui::DocsetsDialog *ui = nullptr;
@@ -111,13 +114,15 @@ private:
     void cancelDownloads();
 
     void loadUserFeedList();
+    void loadDocsetList(const QString& cacheFileName, DocsetType type);
     void downloadDocsetList();
-    void processDocsetList(const QJsonArray &list);
+    void processDocsetList(const QJsonDocument& list, DocsetType type);
 
     void downloadDashDocset(const QModelIndex &index);
     void removeDocset(const QString &name);
 
     void updateStatus();
+    QJsonArray getUserContributedDocsetList(const QJsonDocument& jsonDoc) const;
 
     // FIXME: Come up with a better approach
     QString docsetNameForTmpFilePath(const QString &filePath) const;
