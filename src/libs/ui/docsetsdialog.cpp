@@ -62,9 +62,9 @@ const char UserContributedDocsetListCacheFileName[] = "com.kapeli.json.user_cont
 
 // TODO manage mirror
 const char UserContributedApiUrl[] =
-  "http://london.kapeli.com/feeds/zzz/user_contributed/build/index.json";
+  "https://kapeli.com/feeds/zzz/user_contributed/build/index.json";
 const char UserContributedDocsetListUrl[] =
-  "http://london.kapeli.com/feeds/zzz/user_contributed/build/%1/%2";
+  "https://kapeli.com/feeds/zzz/user_contributed/build/%1/%2";
 
 // TODO: Make the timeout period configurable
 constexpr int CacheTimeout = 24 * 60 * 60 * 1000; // 24 hours in microseconds
