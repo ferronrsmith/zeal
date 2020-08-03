@@ -793,7 +793,10 @@ void DocsetsDialog::downloadDashDocset(const QModelIndex &index)
 
     Registry::DocsetMetadata metadata = m_availableDocsets[name];
     QUrl url;
-    if (!m_userFeeds.contains(name)) {
+    // provision for user contributed data sets
+    if (!metadata.urls().isEmpty()) {
+        url = metadata.url();
+    } else if (!m_userFeeds.contains(name)) {
         // No feed present means that this is a Kapeli docset
         QString urlString = QString(RedirectServerUrl).arg("com.kapeli", name);
         url = QUrl(urlString);
