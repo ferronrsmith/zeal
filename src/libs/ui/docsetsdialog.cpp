@@ -893,6 +893,10 @@ QJsonArray DocsetsDialog::getUserContributedDocsetList(const QJsonDocument& json
         QString archiveUrl = object[QStringLiteral("archive")].toString();
         QString url = QString(UserContributedDocsetListUrl).arg(name, archiveUrl);
         object[QStringLiteral("urls")] = QJsonArray::fromStringList(QStringList() << url);
+
+        //fetch the latest user contributed version
+        QString lastestVersion = object[QStringLiteral("version")].toString();
+        object[QStringLiteral("versions")] = QJsonArray::fromStringList(QStringList() << lastestVersion);
         jsonArray.append(object);
     }
 
