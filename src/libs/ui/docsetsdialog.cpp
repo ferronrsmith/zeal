@@ -760,6 +760,11 @@ void DocsetsDialog::processDocsetList(const QJsonDocument &jsonDoc, DocsetType t
         Registry::DocsetMetadata metadata(docsetJson);
         m_availableDocsets.insert({metadata.name(), metadata});
 
+        QListWidgetItem *hasItem = findDocsetListItem(metadata.name());
+        if (hasItem) {
+            continue;
+        }
+
         auto listItem = new QListWidgetItem(metadata.icon(), metadata.title(), ui->availableDocsetList);
         listItem->setData(Registry::ItemDataRole::DocsetNameRole, metadata.name());
 
@@ -888,9 +893,12 @@ QJsonArray DocsetsDialog::getUserContributedDocsetList(const QJsonDocument& json
         object[QStringLiteral("title")] = object[QStringLiteral("name")];
         object[QStringLiteral("icon2x")] = object[QStringLiteral("icon\\@2x")];
 
-        // build download url
-        QString name = object[QStringLiteral("name")].toString();
+
+        // replace spaces in string with underscore
+        QString name = object[QStringLiteral("name")].toString().replace(' ', '_');
         QString archiveUrl = object[QStringLiteral("archive")].toString();
+
+        // build download url
         QString url = QString(UserContributedDocsetListUrl).arg(name, archiveUrl);
         object[QStringLiteral("urls")] = QJsonArray::fromStringList(QStringList() << url);
 
