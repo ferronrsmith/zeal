@@ -85,16 +85,27 @@ SearchSidebar::SearchSidebar(const SearchSidebar *other, QWidget *parent)
     connect(m_treeView, &QTreeView::clicked, this, &SearchSidebar::navigateToIndex);
 
     // Setup Alt+Up, Alt+Down, etc shortcuts.
-    const auto keyList = {Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right,
-                          Qt::Key_PageUp, Qt::Key_PageDown,
-                          Qt::Key_Home, Qt::Key_End};
-    for (const auto key : keyList) {
+    const auto altKeyList = {Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right,
+                             Qt::Key_PageUp, Qt::Key_PageDown,
+                             Qt::Key_Home, Qt::Key_End};
+    for (const auto key : altKeyList) {
         auto shortcut = new QShortcut(key | Qt::AltModifier, this);
         connect(shortcut, &QShortcut::activated, this, [this, key]() {
             QKeyEvent event(QKeyEvent::KeyPress, key, Qt::NoModifier);
             QCoreApplication::sendEvent(m_treeView, &event);
         });
     }
+
+    // Setup Ctrl+N, Ctrl+P shortcuts.
+    /* const Qt::Key ctrlKeyList[][2] = {{Qt::Key_N, Qt::Key_Down}, */
+    /*                                   {Qt::Key_P, Qt::Key_Up}}; */
+    /* for (const auto mapping : ctrlKeyList) { */
+    /*     auto shortcut = new QShortcut(QKeySequence(Qt::CTRL + mapping[0]), this); */
+    /*     connect(shortcut, &QShortcut::activated, this, [this, mapping]() { */
+    /*         QKeyEvent event(QKeyEvent::KeyPress, mapping[1], Qt::NoModifier); */
+    /*         QCoreApplication::sendEvent(m_treeView, &event); */
+    /*     }); */
+    /* } */
 
     // Setup page TOC view.
     // TODO: Move to a separate Sidebar View.
@@ -388,7 +399,21 @@ bool SearchSidebar::eventFilter(QObject *object, QEvent *event)
         case Qt::Key_PageUp:
             QCoreApplication::sendEvent(m_treeView, event);
             break;
+        }
 
+        if (e->modifiers() == Qt::ControlModifier) {
+            switch (e->key()) {
+            case Qt::Key_N: {
+                QKeyEvent newEvent(QKeyEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
+                QCoreApplication::sendEvent(m_treeView, &newEvent);
+                break;
+            }
+            case Qt::Key_P: {
+                QKeyEvent newEvent(QKeyEvent::KeyPress, Qt::Key_Up, Qt::NoModifier);
+                QCoreApplication::sendEvent(m_treeView, &newEvent);
+                break;
+            }
+            }
         }
     }
 
